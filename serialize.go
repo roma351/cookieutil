@@ -19,12 +19,12 @@ func NewWithPublicSuffix() (*Jar, error) {
 	})
 }
 
-func NewFromJSON(jsonStr string) (*Jar, error) {
+func NewFromJSON(data []byte) (*Jar, error) {
 	jar, err := NewWithPublicSuffix()
 	if err != nil {
 		return nil, err
 	}
-	return jar, jar.UnmarshalJSON([]byte(jsonStr))
+	return jar, jar.UnmarshalJSON(data)
 }
 
 // UnmarshalJSON / MarshalJSON
