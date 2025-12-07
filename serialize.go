@@ -2,10 +2,16 @@ package cookiejar
 
 import (
 	"encoding/json"
+	"fmt"
 	"golang.org/x/net/publicsuffix"
+	"log"
+	"sync"
+	"time"
 )
 
 // TODO: cookiejar.Jar vs Browser. 1. example.com: Set-Cookie: id=123; Path=/ -> 2. example.com: Set-Cookie: id=456; Domain=example.com; Path=/
+
+// New
 
 func NewWithPublicSuffix() (*Jar, error) {
 	return New(&Options{
@@ -20,6 +26,8 @@ func NewFromJSON(jsonStr string) (*Jar, error) {
 	}
 	return jar, jar.UnmarshalJSON([]byte(jsonStr))
 }
+
+// UnmarshalJSON / MarshalJSON
 
 func (j *Jar) UnmarshalJSON(data []byte) error {
 	j.mu.Lock()
@@ -69,4 +77,43 @@ func (j *Jar) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(exportData)
+}
+
+// Cookie Change
+
+type cookieChange struct {
+	onChangeCallback func(*Jar) error
+	onChangeDebounce time.Duration
+	onChangeTimer    *time.Timer
+	onChangeTimerMu  *sync.Mutex
+}
+
+func (j *Jar) OnCookieChange(callback func(*Jar) error, debounce time.Duration) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	j.cookieChange.onChangeCallback = callback
+	j.cookieChange.onChangeDebounce = debounce
+	j.cookieChange.onChangeTimer = nil
+	j.cookieChange.onChangeTimerMu = &sync.Mutex{}
+}
+
+func (j *Jar) triggerOnCookieChange() {
+	if j.cookieChange.onChangeCallback == nil {
+		return
+	}
+
+	j.cookieChange.onChangeTimerMu.Lock()
+	defer j.cookieChange.onChangeTimerMu.Unlock()
+
+	if j.cookieChange.onChangeTimer != nil {
+		j.cookieChange.onChangeTimer.Stop()
+	}
+
+	j.cookieChange.onChangeTimer = time.AfterFunc(j.cookieChange.onChangeDebounce, func() {
+		if err := j.cookieChange.onChangeCallback(j); err != nil {
+			log.Println(fmt.Sprintf("roma351/cookieutil triggerOnCookieChange error: %v", err))
+			_ = err
+		}
+	})
 }

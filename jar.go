@@ -72,6 +72,8 @@ type Jar struct {
 	// nextSeqNum is the next sequence number assigned to a new cookie
 	// created SetCookies.
 	nextSeqNum uint64
+
+	cookieChange cookieChange
 }
 
 // New returns a new cookie jar. A nil [*Options] is equivalent to a zero
@@ -251,6 +253,8 @@ func (j *Jar) setCookies(u *url.URL, cookies []*http.Cookie, now time.Time) {
 
 	j.mu.Lock()
 	defer j.mu.Unlock()
+
+	j.triggerOnCookieChange()
 
 	submap := j.entries[key]
 
